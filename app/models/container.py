@@ -1,12 +1,14 @@
 from app import db
 import uuid
 from sqlalchemy.dialects.postgresql import JSONB
+from enum import Enum
 
 
 class ContainerStatus(str, Enum):
     RUNNING = "running"
     STOPPED = "stopped"
     FAILED = "failed"
+    PENDING = "pending"
 
 
 class Container(db.Model):
@@ -15,9 +17,7 @@ class Container(db.Model):
     id = db.Column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )  # UUID as primary key
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=False
-    )  # FK to users table
+    user_id = db.Column(db.UUID, nullable=True)  # FK to users table
     image_name = db.Column(db.String(255), nullable=True)
     status = db.Column(
         db.Enum(ContainerStatus),

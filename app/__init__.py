@@ -28,8 +28,8 @@ def create_app():
     db.init_app(app)
 
     # Register Blueprints
-    from .routes.auth_routes import auth_bp
+    from .routes.container_routes import deploy_bp
 
-    app.register_blueprint(auth_bp, url_prefix="/api/auth")
+    app.register_blueprint(deploy_bp, url_prefix="/api/deploy")
 
     return app
