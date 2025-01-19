@@ -14,7 +14,7 @@ SECRET_KEY = "yummysecret"  # Replace with an environment variable
 
 
 @deploy_bp.route("/container", methods=["POST"])
-def make_container():
+def make_container(img_name):
     # Create a Docker client
     client = docker.from_env()
 
@@ -26,6 +26,11 @@ def make_container():
     )
 
     # TODO add container to db
+    new_container = Container(
+        status=ContainerStatus.RUNNING,
+        image_name=img_name,
+        config={"port": 8082},
+    )
 
     print(f"Container {container.id} is running.")
     return jsonify({"container_id created ": container.id})

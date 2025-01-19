@@ -17,7 +17,7 @@ class Container(db.Model):
     id = db.Column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )  # UUID as primary key
-    user_id = db.Column(db.UUID, nullable=True)  # FK to users table
+    user_id = db.Column(db.UUID, nullable=False)  # Remove FK, keep UUID reference
     image_name = db.Column(db.String(255), nullable=True)
     status = db.Column(
         db.Enum(ContainerStatus),
@@ -26,10 +26,6 @@ class Container(db.Model):
     )
     config = db.Column(JSONB, nullable=True)  # JSONB for configuration
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-
-    user = db.relationship(
-        "User", backref=db.backref("containers", lazy=True)
-    )  # Relationship to User model
 
     def __repr__(self):
         return f"<Container {self.id} - {self.image_name}>"
