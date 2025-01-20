@@ -30,7 +30,10 @@ def login_required(f):
 
         try:
             # Call the auth service to validate the token
-            current_app.logger.info("Calling auth service to validate token")
+
+            current_app.logger.info(
+                "Calling auth service to validate token. The token is: " + token
+            )
             response = requests.post(
                 AUTH_SERVICE_URL,
                 json={"token": token},

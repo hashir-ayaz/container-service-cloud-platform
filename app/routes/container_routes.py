@@ -34,6 +34,7 @@ def make_container():
     data = request.get_json()
     available_model_id = data.get("available_model_id")
     env_vars = data.get("environment", {})  # Default to an empty object
+    name = data.get("name")
 
     current_app.logger.debug(f"Request data received: {data}")
 
@@ -71,6 +72,7 @@ def make_container():
             image=available_model.docker_image,
             detach=True,  # Run in the background
             environment=env_vars,  # Pass environment variables
+            name=name,
         )
 
         current_app.logger.info(f"Container {container.id} started successfully")
