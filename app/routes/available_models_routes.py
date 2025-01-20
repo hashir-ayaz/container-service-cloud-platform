@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, make_response
-from app.models.available_model import AvailableModel
+from app.models.available_models import AvailableModel
 from app import db
 
 # Define the Blueprint
