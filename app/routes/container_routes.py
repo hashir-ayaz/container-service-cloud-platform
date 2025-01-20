@@ -5,12 +5,17 @@ from flask import Blueprint, request, jsonify, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models.container import Container, ContainerStatus
 from app import db
+from dotenv import load_dotenv
+import os
+
+# Load variables from .env file
+load_dotenv()
 
 # Define the Blueprint
 deploy_bp = Blueprint("deploy", __name__, url_prefix="/api/deploy")
 
 # Secret key for signing tokens (should be stored in environment variables in production)
-SECRET_KEY = "yummysecret"  # Replace with an environment variable
+SECRET_KEY = os.environ.get("SECRET_KEY")  # Replace with an environment variable
 
 
 @deploy_bp.route("/container", methods=["POST"])
