@@ -83,6 +83,7 @@ def make_container():
             available_model_id=available_model_id,
             status=ContainerStatus.RUNNING,
             config={"environment": env_vars},
+            name=name,
         )
         db.session.add(new_container)
         db.session.commit()
@@ -112,3 +113,50 @@ def make_container():
     except Exception as e:
         current_app.logger.error(f"Unexpected error: {str(e)}")
         return make_response(jsonify({"error": "Internal server error"}), 500)
+
+
+@deploy_bp.route("/container/<string:container_id>", methods=["GET"])
+@login_required
+def get_container_by_id(container_id):
+    current_app.logger.info(f"Fetching container with ID: {container_id}")
+
+    container = Container.query.get(container_id)
+    if not container:
+        current_app.logger.warning(f"Container with ID {container_id} not found")
+        return jsonify({"error": "Container not found"}), 404
+
+    return jsonify(
+        {
+            "id": container.id,
+            "user_id": container.user_id,
+            "available_model_id": container.available_model_id,
+            "status": container.status,
+            "config": container.config,
+            "created_at": container.created_at,
+        }
+    )
+
+
+@deploy_bp.route("/containers/user/<int:user_id>", methods=["GET"])
+@login_required
+def get_containers_by_user_id(user_id):
+    current_app.logger.info(f"Fetching containers for user ID: {user_id}")
+
+    containers = Container.query.filter_by(user_id=user_id).all()
+    if not containers:
+        current_app.logger.warning(f"No containers found for user ID {user_id}")
+        return jsonify({"error": "No containers found for the specified user"}), 404
+
+    return jsonify(
+        [
+            {
+                "id": container.id,
+                "user_id": container.user_id,
+                "available_model_id": container.available_model_id,
+                "status": container.status,
+                "config": container.config,
+                "created_at": container.created_at,
+            }
+            for container in containers
+        ]
+    )
