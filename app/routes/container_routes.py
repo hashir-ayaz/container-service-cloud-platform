@@ -1,9 +1,10 @@
 import jwt
 import datetime
 import docker
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify, make_response, g
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models.container import Container, ContainerStatus
+from app.models.available_model import AvailableModel
 from app import db
 from dotenv import load_dotenv
 import os
@@ -18,24 +19,64 @@ deploy_bp = Blueprint("deploy", __name__, url_prefix="/api/deploy")
 SECRET_KEY = os.environ.get("SECRET_KEY")  # Replace with an environment variable
 
 
+# Define the Blueprint
+deploy_bp = Blueprint("deploy", __name__, url_prefix="/api/deploy")
+
+
 @deploy_bp.route("/container", methods=["POST"])
-def make_container(img_name):
+@login_required
+def make_container():
+    # Parse request data
+    user = g.get("user", None)
+    data = request.get_json()
+    available_model_id = data.get("available_model_id")
+    env_vars = data.get("environment", {})  # Default to an empty object
+
+    # Validate required fields
+    if not available_model_id:
+        return make_response(
+            jsonify({"error": "Missing required field: 'available_model_id'"}), 400
+        )
+
+    # Fetch the available model
+    available_model = AvailableModel.query.get(available_model_id)
+    if not available_model:
+        return make_response(
+            jsonify(
+                {"error": f"Available model with ID {available_model_id} not found"}
+            ),
+            404,
+        )
+
     # Create a Docker client
     client = docker.from_env()
 
-    # Run a container
-    container = client.containers.run(
-        "nginx",  # Image name
-        detach=True,  # Run in the background
-        ports={"80/tcp": 8082},  # Map container's port 80 to host port 8080
-    )
+    try:
+        # Run a container
+        container = client.containers.run(
+            image=available_model.docker_image,
+            detach=True,  # Run in the background
+            environment=env_vars,  # Pass environment variables
+        )
 
-    # TODO add container to db
-    new_container = Container(
-        status=ContainerStatus.RUNNING,
-        image_name=img_name,
-        config={"port": 8082},
-    )
+        # Add container to the database
+        new_container = Container(
+            user_id=user.id,  # Example user_id
+            available_model_id=available_model_id,
+            status=ContainerStatus.RUNNING,
+            config={"environment": env_vars},
+        )
+        db.session.add(new_container)
+        db.session.commit()
 
-    print(f"Container {container.id} is running.")
-    return jsonify({"container_id created ": container.id})
+        print(f"Container {container.id} is running.")
+        return jsonify(
+            {
+                "message": "Container created successfully",
+                "container_id": container.id,
+                "available_model_id": available_model_id,
+                "environment": env_vars,
+            }
+        )
+    except docker.errors.DockerException as e:
+        return make_response(jsonify({"error": str(e)}), 500)
