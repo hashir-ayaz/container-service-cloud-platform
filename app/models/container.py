@@ -17,7 +17,7 @@ class Container(db.Model):
     id = db.Column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )  # UUID as primary key
-    user_id = db.Column(db.UUID, nullable=False)  # Keep UUID reference for the user
+    user_id = db.Column(db.Integer, nullable=False)
     available_model_id = db.Column(
         db.Integer, db.ForeignKey("available_models.id"), nullable=False
     )  # Foreign key referencing `available_models.id`
