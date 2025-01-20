@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS, cross_origin
 from flask_migrate import Migrate
 import os
+import logging
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -19,6 +20,14 @@ def create_app():
         },
         supports_credentials=True,
     )
+
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler()],  # Logs to the console
+    )
+    app.logger.info("Logging is configured.")
 
     # PostgreSQL configuration
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
