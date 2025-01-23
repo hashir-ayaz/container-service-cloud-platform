@@ -13,10 +13,17 @@ def create_app():
     app = Flask(__name__)
 
     # Enable CORS globally
+    # CORS(
+    #     app,
+    #     resources={
+    #         r"/api/*": {"origins": os.getenv("FRONTEND_URL", "http://localhost:5173")},
+    #     },
+    #     supports_credentials=True,
+    # )
     CORS(
         app,
         resources={
-            r"/api/*": {"origins": os.getenv("FRONTEND_URL", "http://localhost:5173")},
+            r"/api/*": {"origins": "*"},  # Allow all origins for routes starting with /api/
         },
         supports_credentials=True,
     )
