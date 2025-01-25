@@ -2,12 +2,12 @@ from functools import wraps
 from flask import request, jsonify, g, current_app
 import requests
 import os
-import dotenv
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Auth service URL
-AUTH_SERVICE_URL = os.environ.get(
-    "AUTH_SERVICE_URL",
-)
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://localhost:5001/api")
 
 
 def login_required(f):
@@ -36,7 +36,7 @@ def login_required(f):
                 "Calling auth service to validate token. The token is: " + token
             )
             response = requests.post(
-                f"AUTH_SERVICE_URL/validate-token",
+                f"{AUTH_SERVICE_URL}/auth/validate-token",
                 json={"token": token},
                 timeout=5,  # Set a timeout to avoid hanging requests
             )

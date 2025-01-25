@@ -9,6 +9,7 @@ from app import db
 from dotenv import load_dotenv
 import os
 from app.middleware.protected import login_required
+from app.utils.user_request_utils import assign_port
 
 # Load variables from .env file
 load_dotenv()
