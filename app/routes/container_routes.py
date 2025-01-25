@@ -60,6 +60,14 @@ def make_container():
 
     current_app.logger.info(f"Available model found: {available_model.name}")
 
+    # Assign a unique port for the container
+    try:
+        port = assign_port(user["id"])  # Assign a port based on the user's ID
+        current_app.logger.info(f"Assigned port: {port}")
+    except Exception as e:
+        current_app.logger.error(f"Failed to assign port: {str(e)}")
+        return make_response(jsonify({"error": "Failed to assign port"}), 500)
+
     # Create a Docker client
     client = docker.from_env()
 
@@ -67,15 +75,18 @@ def make_container():
         current_app.logger.info(
             f"Attempting to run Docker container for image {available_model.docker_image}"
         )
-        # Run a container
+        # Run a container with the assigned port
         container = client.containers.run(
             image=available_model.docker_image,
             detach=True,  # Run in the background
             environment=env_vars,  # Pass environment variables
             name=name,
+            ports={"80/tcp": port},  # Map container port 80 to the assigned host port
         )
 
-        current_app.logger.info(f"Container {container.id} started successfully")
+        current_app.logger.info(
+            f"Container {container.id} started successfully on port {port}"
+        )
 
         # Add container to the database
         new_container = Container(
@@ -84,6 +95,7 @@ def make_container():
             status=ContainerStatus.RUNNING,
             config={"environment": env_vars},
             name=name,
+            port=port,  # Save the assigned port in the database
         )
         db.session.add(new_container)
         db.session.commit()
@@ -98,6 +110,7 @@ def make_container():
                 "container_id": container.id,
                 "available_model_id": available_model_id,
                 "environment": env_vars,
+                "port": port,  # Return the assigned port in the response
             }
         )
     except docker.errors.ImageNotFound:

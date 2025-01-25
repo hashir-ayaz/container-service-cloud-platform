@@ -27,6 +27,7 @@ class Container(db.Model):
         default=ContainerStatus.STOPPED,
         nullable=False,
     )  # Enum for container status
+    port = db.Column(db.Integer, nullable=True)
     config = db.Column(JSONB, nullable=True)  # JSONB for configuration
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
