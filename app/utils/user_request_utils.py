@@ -1,11 +1,14 @@
 import hashlib
 import socket
 import docker
+import time  # Import time for the current timestamp
 
 
-# this function hashes the user_id and returns a port number
+# This function hashes the user_id and the current time to return a port number
 def hash_to_port(user_id, base_port=6000, port_range=1000):
-    hash_object = hashlib.sha256(str(user_id).encode())
+    current_time = int(time.time())  # Get the current time as an integer (seconds since epoch)
+    unique_data = f"{user_id}_{current_time}"  # Combine user_id and current time
+    hash_object = hashlib.sha256(unique_data.encode())
     hash_hex = hash_object.hexdigest()
     hash_int = int(hash_hex, 16)
     port = base_port + (hash_int % port_range)
@@ -21,7 +24,7 @@ def is_port_available(port):
             return False
 
 
-def assign_port(user_id, max_retries=10):
+def assign_port(user_id, max_retries=25):
     base_port = hash_to_port(user_id)
     port = base_port
 
