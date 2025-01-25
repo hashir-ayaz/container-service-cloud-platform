@@ -18,8 +18,11 @@ def login_required(f):
         current_app.logger.info("Attempting to extract token from headers")
 
         if not token:
-            token = request.cookies.get("jwt")
             current_app.logger.info("Token not found in headers; checking cookies")
+            token = request.cookies.get("jwt")
+            current_app.logger.info(f"the token in cookies is {token}")
+            
+        current_app.logger.info(f"the cookies for this request are {request.cookies}")
 
         if not token:
             current_app.logger.warning("Authorization token is missing")
