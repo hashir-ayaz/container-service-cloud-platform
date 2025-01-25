@@ -25,6 +25,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY")  # Replace with an environment variabl
 @login_required
 def make_container():
     current_app.logger.info("Make container endpoint hit")
+    print(f"Auth service url is {os.environ.get('AUTH_SERVICE_URL')}")
 
     # Parse request data
     user = g.get("user", None)
