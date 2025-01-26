@@ -1,6 +1,7 @@
 from app import db
 import uuid
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
 from enum import Enum
 
 
@@ -27,7 +28,7 @@ class Container(db.Model):
         default=ContainerStatus.STOPPED,
         nullable=False,
     )  # Enum for container status
-    port = db.Column(db.Integer, nullable=True)
+    ports = db.Column(JSONB, nullable=True)  # JSONB for port mappings (host:container)
     config = db.Column(JSONB, nullable=True)  # JSONB for configuration
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 

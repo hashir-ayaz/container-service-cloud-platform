@@ -6,7 +6,9 @@ import time  # Import time for the current timestamp
 
 # This function hashes the user_id and the current time to return a port number
 def hash_to_port(user_id, base_port=6000, port_range=1000):
-    current_time = int(time.time())  # Get the current time as an integer (seconds since epoch)
+    current_time = int(
+        time.time()
+    )  # Get the current time as an integer (seconds since epoch)
     unique_data = f"{user_id}_{current_time}"  # Combine user_id and current time
     hash_object = hashlib.sha256(unique_data.encode())
     hash_hex = hash_object.hexdigest()
@@ -24,8 +26,8 @@ def is_port_available(port):
             return False
 
 
-def assign_port(user_id, max_retries=25):
-    base_port = hash_to_port(user_id)
+def assign_port(user_id, unique_offset=0, max_retries=25):
+    base_port = hash_to_port(user_id + unique_offset)
     port = base_port
 
     for _ in range(max_retries):

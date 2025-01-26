@@ -37,6 +37,7 @@ def make_container():
     available_model_id = data.get("available_model_id")
     env_vars = data.get("environment", {})  # Default to an empty object
     name = data.get("name")
+    requested_ports = data.get("ports", [])  # Ports requested by the user
 
     current_app.logger.debug(f"Request data received: {data}")
 
@@ -46,6 +47,10 @@ def make_container():
         return make_response(
             jsonify({"error": "Missing required field: 'available_model_id'"}), 400
         )
+
+    if not requested_ports:
+        current_app.logger.warning("Request missing 'ports'")
+        return make_response(jsonify({"error": "Missing required field: 'ports'"}), 400)
 
     # Fetch the available model
     available_model = AvailableModel.query.get(available_model_id)
@@ -62,13 +67,43 @@ def make_container():
 
     current_app.logger.info(f"Available model found: {available_model.name}")
 
-    # Assign a unique port for the container
+    # Assign and validate ports
     try:
-        port = assign_port(user["id"])  # Assign a port based on the user's ID
-        current_app.logger.info(f"Assigned port: {port}")
+        host_ports = {}
+        port_mappings = []  # To store the host-port to container-port mapping
+        used_host_ports = set()  # To track already used host ports
+
+        for i, port_entry in enumerate(requested_ports):
+            container_port = port_entry.get("port")
+            protocol = port_entry.get(
+                "protocol", "tcp"
+            )  # Default to TCP if not provided
+
+            if not container_port:
+                current_app.logger.warning(f"Port entry missing 'port': {port_entry}")
+                continue
+
+            for _ in range(25):  # Retry up to 25 times for a unique host port
+                host_port = assign_port(user["id"], unique_offset=i)
+                if host_port not in used_host_ports:
+                    used_host_ports.add(host_port)
+                    break
+            else:
+                raise Exception("Failed to find a unique host port after retries")
+
+            host_ports[f"{container_port}/{protocol}"] = host_port
+            port_mappings.append(
+                {
+                    "host_port": host_port,
+                    "container_port": container_port,
+                    "protocol": protocol,
+                }
+            )
+
+        current_app.logger.info(f"Assigned port mappings: {port_mappings}")
     except Exception as e:
-        current_app.logger.error(f"Failed to assign port: {str(e)}")
-        return make_response(jsonify({"error": "Failed to assign port"}), 500)
+        current_app.logger.error(f"Failed to assign ports: {str(e)}")
+        return make_response(jsonify({"error": "Failed to assign ports"}), 500)
 
     # Create a Docker client
     client = docker.from_env()
@@ -77,17 +112,17 @@ def make_container():
         current_app.logger.info(
             f"Attempting to run Docker container for image {available_model.docker_image}"
         )
-        # Run a container with the assigned port
+        # Run a container with the assigned ports
         container = client.containers.run(
             image=available_model.docker_image,
             detach=True,  # Run in the background
             environment=env_vars,  # Pass environment variables
             name=name,
-            ports={"80/tcp": port},  # Map container port 80 to the assigned host port
+            ports=host_ports,  # Map container ports to host ports
         )
 
         current_app.logger.info(
-            f"Container {container.id} started successfully on port {port}"
+            f"Container {container.id} started successfully with ports {host_ports}"
         )
 
         # Add container to the database
@@ -97,7 +132,7 @@ def make_container():
             status=ContainerStatus.RUNNING,
             config={"environment": env_vars},
             name=name,
-            port=port,  # Save the assigned port in the database
+            ports=port_mappings,  # Save the port mappings in the database
         )
         db.session.add(new_container)
         db.session.commit()
@@ -112,7 +147,7 @@ def make_container():
                 "container_id": container.id,
                 "available_model_id": available_model_id,
                 "environment": env_vars,
-                "port": port,  # Return the assigned port in the response
+                "ports": port_mappings,  # Return the assigned ports in the response
             }
         )
     except docker.errors.ImageNotFound:
