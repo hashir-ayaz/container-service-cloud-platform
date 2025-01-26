@@ -202,10 +202,15 @@ def get_containers_by_user_id(user_id):
             {
                 "id": container.id,
                 "user_id": container.user_id,
+                "name": container.name,
                 "available_model_id": container.available_model_id,
-                "status": container.status,
+                "model_name": container.available_model.name,  # Include model name
+                "model_description": container.available_model.description,  # Include model description
+                "docker_image": container.available_model.docker_image,  # Include Docker image
+                "status": container.status.value,  # Convert Enum to string
+                "ports": container.ports,  # Include port mappings
                 "config": container.config,
-                "created_at": container.created_at,
+                "created_at": container.created_at.isoformat(),  # Ensure JSON serializable
             }
             for container in containers
         ]
