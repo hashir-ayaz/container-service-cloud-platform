@@ -82,7 +82,7 @@ def assign_ports(user_id, requested_ports):
 
 
 def run_docker_container(available_model, env_vars, name, host_ports):
-    client = docker.from_env()
+    client = docker.from_env(timeout=200)
     try:
         container = client.containers.run(
             image=available_model.docker_image,
