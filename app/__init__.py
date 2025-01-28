@@ -18,6 +18,7 @@ def create_app():
         "http://142.93.214.0:5173",  # Your other frontend URL
         "http://localhost:5174",  # Local development
         "http://localhost:4173",
+        "https://hashirayaz.site",
     ]
 
     # Enable CORS globally
