@@ -2,6 +2,21 @@ import hashlib
 import socket
 import docker
 import time  # Import time for the current timestamp
+from app.models.container import Container
+
+
+"""
+- function to check if the user's container name is already taken by the user
+- if it is taken, return true
+- if it is not taken, return false
+"""
+
+
+def is_container_name_taken(container_name):
+    users_containers = Container.query.filter_by(
+        name=container_name, user_id=g.user.id
+    ).all()
+    return len(users_containers) > 0
 
 
 # This function hashes the user_id and the current time to return a port number

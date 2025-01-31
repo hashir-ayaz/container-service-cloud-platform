@@ -9,7 +9,7 @@ from app import db
 from dotenv import load_dotenv
 import os
 from app.middleware.protected import login_required
-from app.utils.user_request_utils import assign_port
+from app.utils.user_request_utils import assign_port, is_container_name_taken
 
 # Load variables from .env file
 load_dotenv()
@@ -27,6 +27,10 @@ def parse_request_data():
     env_vars = data.get("environment", {})
     name = data.get("name")
     requested_ports = data.get("ports", [])
+
+    # checking if the name is already in use
+    if is_container_name_taken(name):
+        raise ValueError("You already have a container with this name")
 
     if not available_model_id:
         current_app.logger.warning("Request missing 'available_model_id'")
