@@ -5,6 +5,7 @@ import time  # Import time for the current timestamp
 from app.models.container import Container
 
 
+
 """
 - function to check if the user's container name is already taken by the user
 - if it is taken, return true
@@ -12,9 +13,9 @@ from app.models.container import Container
 """
 
 
-def is_container_name_taken(container_name):
+def is_container_name_taken(container_name,user):
     users_containers = Container.query.filter_by(
-        name=container_name, user_id=g.user.id
+        name=container_name, user_id=user.get('id')
     ).all()
     return len(users_containers) > 0
 

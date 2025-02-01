@@ -29,7 +29,7 @@ def parse_request_data():
     requested_ports = data.get("ports", [])
 
     # checking if the name is already in use
-    if is_container_name_taken(name):
+    if is_container_name_taken(name,g.user):
         raise ValueError("You already have a container with this name")
 
     if not available_model_id:

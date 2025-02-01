@@ -13,6 +13,7 @@ AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://localhost:5001/api
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        from flask import g
         # Extract token from headers or cookies
         token = request.headers.get("Authorization")
         current_app.logger.info("Attempting to extract token from headers")
@@ -55,6 +56,7 @@ def login_required(f):
             # Store the user information in Flask's `g` context
             g.user = user_data
             current_app.logger.info(f"User authenticated: {user_data['id']}")
+            current_app.logger.info("g.user is " + str(g.user))
         except requests.exceptions.Timeout:
             current_app.logger.error("Auth service request timed out")
             return jsonify({"error": "Auth service timeout"}), 504
