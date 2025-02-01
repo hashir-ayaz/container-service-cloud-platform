@@ -146,6 +146,13 @@ def make_container():
         container = run_docker_container(available_model, env_vars, name, host_ports)
         current_app.logger.info(f"Container {container.id} started successfully")
 
+        # Create and Store API Key
+        api_key_value = store_api_key(user["id"], container.id) 
+        current_app.logger.info(f"API Key {api_key_value} created and stored for container {container.id}")
+        
+        # Need to add logic to add the container to traefik reverse proxy
+      
+
         # Save container to the database
         new_container = save_container_to_db(
             user_id=user["id"],
