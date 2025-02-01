@@ -187,6 +187,7 @@ def make_container():
 @deploy_bp.route("/container/<string:container_id>", methods=["GET"])
 @login_required
 def get_container_by_id(container_id):
+    """Fetch complete details of a container by its ID."""
     current_app.logger.info(f"Fetching container with ID: {container_id}")
 
     container = Container.query.get(container_id)
@@ -194,16 +195,27 @@ def get_container_by_id(container_id):
         current_app.logger.warning(f"Container with ID {container_id} not found")
         return jsonify({"error": "Container not found"}), 404
 
+    current_app.logger.info(f"Container found: {container}")
+
     return jsonify(
         {
             "id": container.id,
             "user_id": container.user_id,
+            "name": container.name,
             "available_model_id": container.available_model_id,
-            "status": container.status,
-            "config": container.config,
-            "created_at": container.created_at,
+            "model_name": container.available_model.name,  # Model details
+            "model_description": container.available_model.description,
+            "docker_image": container.available_model.docker_image,
+            "version": container.available_model.version,
+            "status": container.status.value,  # Convert Enum to string
+            "ports": container.ports if container.ports else [],
+            "config": container.config if container.config else {},  # Environment variables
+            "created_at": container.created_at.isoformat(),  # Ensure JSON serializable
+            "updated_at": container.available_model.updated_at.isoformat(),  # Model update time
+            "is_active": container.available_model.is_active,  # Model active status
         }
     )
+
 
 
 @deploy_bp.route("/containers/user/<int:user_id>", methods=["GET"])
@@ -234,3 +246,101 @@ def get_containers_by_user_id(user_id):
             for container in containers
         ]
     )
+
+
+@deploy_bp.route("/container/<string:container_id>/stop", methods=["POST"])
+@login_required
+def stop_container(container_id):
+    """Stop a running container."""
+    current_app.logger.info(f"Attempting to stop container: {container_id}")
+
+    container = Container.query.get(container_id)
+    if not container:
+        current_app.logger.warning(f"Container with ID {container_id} not found")
+        return jsonify({"error": "Container not found"}), 404
+
+    if container.user_id != g.user["id"]:
+        current_app.logger.warning("Unauthorized attempt to stop container")
+        return jsonify({"error": "Unauthorized"}), 403
+
+    client = docker.from_env()
+
+    try:
+        docker_container = client.containers.get(container_id)
+        docker_container.stop()
+        container.status = ContainerStatus.STOPPED
+        db.session.commit()
+        current_app.logger.info(f"Container {container_id} stopped successfully")
+        return jsonify({"message": "Container stopped successfully", "status": container.status.value})
+    except docker.errors.NotFound:
+        current_app.logger.error(f"Docker container {container_id} not found")
+        return jsonify({"error": "Docker container not found"}), 404
+    except docker.errors.APIError as e:
+        current_app.logger.error(f"Error stopping container {container_id}: {str(e)}")
+        return jsonify({"error": "Failed to stop container"}), 500
+
+
+@deploy_bp.route("/container/<string:container_id>", methods=["DELETE"])
+@login_required
+def delete_container(container_id):
+    """Delete a container and remove it from Docker."""
+    current_app.logger.info(f"Attempting to delete container: {container_id}")
+
+    container = Container.query.get(container_id)
+    if not container:
+        current_app.logger.warning(f"Container with ID {container_id} not found")
+        return jsonify({"error": "Container not found"}), 404
+
+    if container.user_id != g.user["id"]:
+        current_app.logger.warning("Unauthorized attempt to delete container")
+        return jsonify({"error": "Unauthorized"}), 403
+
+    client = docker.from_env()
+
+    try:
+        docker_container = client.containers.get(container_id)
+        docker_container.remove(force=True)  # Forcefully remove the container
+    except docker.errors.NotFound:
+        current_app.logger.warning(f"Docker container {container_id} not found, removing from database")
+    except docker.errors.APIError as e:
+        current_app.logger.error(f"Error deleting container {container_id}: {str(e)}")
+        return jsonify({"error": "Failed to delete container"}), 500
+
+    # Remove the container entry from the database
+    db.session.delete(container)
+    db.session.commit()
+
+    current_app.logger.info(f"Container {container_id} deleted successfully")
+    return jsonify({"message": "Container deleted successfully"})
+
+
+@deploy_bp.route("/container/<string:container_id>/start", methods=["POST"])
+@login_required
+def start_container(container_id):
+    """Start a stopped container."""
+    current_app.logger.info(f"Attempting to start container: {container_id}")
+
+    container = Container.query.get(container_id)
+    if not container:
+        current_app.logger.warning(f"Container with ID {container_id} not found")
+        return jsonify({"error": "Container not found"}), 404
+
+    if container.user_id != g.user["id"]:
+        current_app.logger.warning("Unauthorized attempt to start container")
+        return jsonify({"error": "Unauthorized"}), 403
+
+    client = docker.from_env()
+
+    try:
+        docker_container = client.containers.get(container_id)
+        docker_container.start()
+        container.status = ContainerStatus.RUNNING
+        db.session.commit()
+        current_app.logger.info(f"Container {container_id} started successfully")
+        return jsonify({"message": "Container started successfully", "status": container.status.value})
+    except docker.errors.NotFound:
+        current_app.logger.error(f"Docker container {container_id} not found")
+        return jsonify({"error": "Docker container not found"}), 404
+    except docker.errors.APIError as e:
+        current_app.logger.error(f"Error starting container {container_id}: {str(e)}")
+        return jsonify({"error": "Failed to start container"}), 500
