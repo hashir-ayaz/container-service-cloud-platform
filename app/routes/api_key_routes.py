@@ -4,22 +4,19 @@ from app import db
 from app.models.api_key import APIKey
 from app.models.container import Container
 from app.middleware.protected import login_required
-from werkzeug.security import generate_password_hash
 from app.utils.api_key_utils import (
     delete_api_key_by_id,
-    generate_api_key,
     get_authenticated_user,
     get_user_container,
     store_api_key,
 )
-
 
 # Define the Blueprint
 api_key_bp = Blueprint("api_key", __name__, url_prefix="/api/api-keys")
 
 
 # 🔹 Create API Key Route
-@api_key_bp.route("/create", methods=["POST"])
+@api_key_bp.route("/", methods=["POST"])
 @login_required
 def create_api_key():
     current_app.logger.info("Create API Key endpoint hit")
@@ -57,7 +54,7 @@ def create_api_key():
 
 
 # 🔹 Delete API Key Route
-@api_key_bp.route("/delete/<string:api_key_id>", methods=["DELETE"])
+@api_key_bp.route("/<string:api_key_id>", methods=["DELETE"])
 @login_required
 def delete_api_key(api_key_id):
     current_app.logger.info(f"Delete API Key endpoint hit for API key ID: {api_key_id}")
@@ -71,15 +68,35 @@ def delete_api_key(api_key_id):
     return delete_api_key_by_id(api_key_id, user["id"])
 
 
+# 🔹 Get API Keys for a Container
 @api_key_bp.route("/<string:container_id>", methods=["GET"])
+@login_required
 def get_api_keys_by_container_id(container_id):
+    current_app.logger.info(f"Fetching API keys for container {container_id}")
+
+    # Retrieve authenticated user
+    user = get_authenticated_user()
+    if not user:
+        return jsonify({"error": "User not authenticated"}), 401
+
+    # Validate container ownership
+    container, error_response = get_user_container(container_id, user["id"])
+    if error_response:
+        return error_response
+
+    # Fetch API keys for the container
     api_keys = APIKey.query.filter_by(container_id=container_id).all()
 
     if not api_keys:
         current_app.logger.warning(f"No API Keys found for container {container_id}")
         return jsonify({"error": "No API Keys found for container"}), 404
 
-    current_app.logger.info(
-        f"API Keys retrieved for container {container_id}: {api_keys}"
+    return (
+        jsonify(
+            {
+                "message": "API keys retrieved successfully",
+                "api_keys": [{"id": key.id, "key": key.key} for key in api_keys],
+            }
+        ),
+        200,
     )
-    return jsonify({"api_keys": [key.key for key in api_keys]}), 200

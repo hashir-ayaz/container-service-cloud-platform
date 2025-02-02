@@ -53,8 +53,10 @@ def create_app():
     # Register Blueprints
     from .routes.container_routes import deploy_bp
     from .routes.available_models_routes import model_bp
+    from .routes.api_key_routes import api_key_bp
 
     app.register_blueprint(deploy_bp, url_prefix="/api/deploy")
     app.register_blueprint(model_bp, url_prefix="/api/models")
+    app.register_blueprint(api_key_bp, url_prefix="/api/api-keys")
 
     return app
