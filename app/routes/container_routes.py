@@ -163,6 +163,7 @@ def make_container():
             env_vars=env_vars,
             port_mappings=port_mappings,
         )
+
         db.session.commit()  # ✅ Ensure container is fully saved
 
         # ✅ Re-fetch container to ensure it exists
@@ -171,6 +172,7 @@ def make_container():
             current_app.logger.error(
                 f"Container {new_container.id} not found in DB after commit."
             )
+            db.session.rollback()  # 🔴 Undo any changes before failing
             return jsonify({"error": "Container save failed"}), 500
 
         # ✅ Introduce a short delay (PostgreSQL replication lag fix)
@@ -179,10 +181,15 @@ def make_container():
         time.sleep(1)
 
         # Create and Store API Key
-        api_key_value = store_api_key(user["id"], new_container.id)
-        current_app.logger.info(
-            f"API Key {api_key_value} created and stored for container {new_container.id}"
-        )
+        try:
+            api_key_value = store_api_key(user["id"], new_container.id)
+            current_app.logger.info(
+                f"API Key {api_key_value} created and stored for container {new_container.id}"
+            )
+        except Exception as e:
+            current_app.logger.error(f"Error generating API key: {str(e)}")
+            db.session.rollback()  # 🔴 Rollback if API key creation fails
+            return jsonify({"error": "Failed to generate API key"}), 500
 
         return jsonify(
             {
@@ -195,12 +202,19 @@ def make_container():
         )
 
     except ValueError as e:
+        db.session.rollback()  # 🔴 Rollback on validation errors
         return make_response(jsonify({"error": str(e)}), 400)
+
     except LookupError as e:
+        db.session.rollback()  # 🔴 Rollback on lookup errors
         return make_response(jsonify({"error": str(e)}), 404)
+
     except RuntimeError as e:
+        db.session.rollback()  # 🔴 Rollback on runtime errors
         return make_response(jsonify({"error": str(e)}), 500)
+
     except Exception as e:
+        db.session.rollback()  # 🔴 Rollback on unexpected errors
         current_app.logger.error(f"Unexpected error: {str(e)}")
         return make_response(jsonify({"error": "Internal server error"}), 500)
 
