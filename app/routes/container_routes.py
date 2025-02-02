@@ -10,6 +10,13 @@ from dotenv import load_dotenv
 import os
 from app.middleware.protected import login_required
 from app.utils.user_request_utils import assign_port, is_container_name_taken
+from app.utils.api_key_utils import (
+    delete_api_key_by_id,
+    generate_api_key,
+    get_authenticated_user,
+    get_user_container,
+    store_api_key,
+)
 
 # Load variables from .env file
 load_dotenv()
@@ -29,7 +36,7 @@ def parse_request_data():
     requested_ports = data.get("ports", [])
 
     # checking if the name is already in use
-    if is_container_name_taken(name,g.user):
+    if is_container_name_taken(name, g.user):
         raise ValueError("You already have a container with this name")
 
     if not available_model_id:
@@ -107,6 +114,7 @@ def run_docker_container(available_model, env_vars, name, host_ports):
 
 
 def save_container_to_db(user_id, available_model_id, name, env_vars, port_mappings):
+    """Save container details in the database before API key generation."""
     new_container = Container(
         user_id=user_id,
         available_model_id=available_model_id,
@@ -115,8 +123,9 @@ def save_container_to_db(user_id, available_model_id, name, env_vars, port_mappi
         name=name,
         ports=port_mappings,
     )
+
     db.session.add(new_container)
-    db.session.commit()
+    db.session.commit()  # ✅ Ensure container is committed first
     return new_container
 
 
@@ -146,13 +155,6 @@ def make_container():
         container = run_docker_container(available_model, env_vars, name, host_ports)
         current_app.logger.info(f"Container {container.id} started successfully")
 
-        # Create and Store API Key
-        api_key_value = store_api_key(user["id"], container.id) 
-        current_app.logger.info(f"API Key {api_key_value} created and stored for container {container.id}")
-        
-        # Need to add logic to add the container to traefik reverse proxy
-      
-
         # Save container to the database
         new_container = save_container_to_db(
             user_id=user["id"],
@@ -161,12 +163,31 @@ def make_container():
             env_vars=env_vars,
             port_mappings=port_mappings,
         )
-        current_app.logger.info(f"Container {container.id} added to the database")
+        db.session.commit()  # ✅ Ensure container is fully saved
+
+        # ✅ Re-fetch container to ensure it exists
+        saved_container = Container.query.get(new_container.id)
+        if not saved_container:
+            current_app.logger.error(
+                f"Container {new_container.id} not found in DB after commit."
+            )
+            return jsonify({"error": "Container save failed"}), 500
+
+        # ✅ Introduce a short delay (PostgreSQL replication lag fix)
+        import time
+
+        time.sleep(1)
+
+        # Create and Store API Key
+        api_key_value = store_api_key(user["id"], new_container.id)
+        current_app.logger.info(
+            f"API Key {api_key_value} created and stored for container {new_container.id}"
+        )
 
         return jsonify(
             {
                 "message": "Container created successfully",
-                "container_id": container.id,
+                "container_id": new_container.id,
                 "available_model_id": available_model_id,
                 "environment": env_vars,
                 "ports": port_mappings,
@@ -209,13 +230,14 @@ def get_container_by_id(container_id):
             "version": container.available_model.version,
             "status": container.status.value,  # Convert Enum to string
             "ports": container.ports if container.ports else [],
-            "config": container.config if container.config else {},  # Environment variables
+            "config": (
+                container.config if container.config else {}
+            ),  # Environment variables
             "created_at": container.created_at.isoformat(),  # Ensure JSON serializable
             "updated_at": container.available_model.updated_at.isoformat(),  # Model update time
             "is_active": container.available_model.is_active,  # Model active status
         }
     )
-
 
 
 @deploy_bp.route("/containers/user/<int:user_id>", methods=["GET"])
@@ -271,7 +293,12 @@ def stop_container(container_id):
         container.status = ContainerStatus.STOPPED
         db.session.commit()
         current_app.logger.info(f"Container {container_id} stopped successfully")
-        return jsonify({"message": "Container stopped successfully", "status": container.status.value})
+        return jsonify(
+            {
+                "message": "Container stopped successfully",
+                "status": container.status.value,
+            }
+        )
     except docker.errors.NotFound:
         current_app.logger.error(f"Docker container {container_id} not found")
         return jsonify({"error": "Docker container not found"}), 404
@@ -301,7 +328,9 @@ def delete_container(container_id):
         docker_container = client.containers.get(container_id)
         docker_container.remove(force=True)  # Forcefully remove the container
     except docker.errors.NotFound:
-        current_app.logger.warning(f"Docker container {container_id} not found, removing from database")
+        current_app.logger.warning(
+            f"Docker container {container_id} not found, removing from database"
+        )
     except docker.errors.APIError as e:
         current_app.logger.error(f"Error deleting container {container_id}: {str(e)}")
         return jsonify({"error": "Failed to delete container"}), 500
@@ -337,7 +366,12 @@ def start_container(container_id):
         container.status = ContainerStatus.RUNNING
         db.session.commit()
         current_app.logger.info(f"Container {container_id} started successfully")
-        return jsonify({"message": "Container started successfully", "status": container.status.value})
+        return jsonify(
+            {
+                "message": "Container started successfully",
+                "status": container.status.value,
+            }
+        )
     except docker.errors.NotFound:
         current_app.logger.error(f"Docker container {container_id} not found")
         return jsonify({"error": "Docker container not found"}), 404
