@@ -222,7 +222,7 @@ def make_container():
 @deploy_bp.route("/container/<string:container_id>", methods=["GET"])
 @login_required
 def get_container_by_id(container_id):
-    """Fetch complete details of a container by its ID."""
+    """Fetch complete details of a container by its ID, including API keys."""
     current_app.logger.info(f"Fetching container with ID: {container_id}")
 
     container = Container.query.get(container_id)
@@ -231,6 +231,17 @@ def get_container_by_id(container_id):
         return jsonify({"error": "Container not found"}), 404
 
     current_app.logger.info(f"Container found: {container}")
+
+    # Fetch API keys associated with the container
+    api_keys = [
+        {
+            "id": api_key.id,
+            "key": api_key.key,
+            "is_active": api_key.is_active,
+            "created_at": api_key.created_at.isoformat(),
+        }
+        for api_key in container.api_keys
+    ]
 
     return jsonify(
         {
@@ -250,6 +261,7 @@ def get_container_by_id(container_id):
             "created_at": container.created_at.isoformat(),  # Ensure JSON serializable
             "updated_at": container.available_model.updated_at.isoformat(),  # Model update time
             "is_active": container.available_model.is_active,  # Model active status
+            "api_keys": api_keys,  # Include API keys
         }
     )
 

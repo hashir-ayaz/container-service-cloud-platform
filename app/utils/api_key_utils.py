@@ -40,12 +40,11 @@ def get_user_container(container_id, user_id):
 def store_api_key(user_id, container_id):
     api_key_value = generate_api_key()
     current_app.logger.info(f"Generated API key: {api_key_value}")
-    hashed_key = generate_password_hash(api_key_value)  # Hashing for security
 
     new_api_key = APIKey(
         user_id=user_id,
         container_id=container_id,
-        key=hashed_key,
+        key=api_key_value,
     )
 
     db.session.add(new_api_key)
