@@ -9,12 +9,12 @@ from app import db
 from dotenv import load_dotenv
 import os
 from app.middleware.protected import login_required
-from app.utils.user_request_utils import assign_port, is_container_name_taken
+from app.utils.user_request_utils import (
+    assign_port,
+    is_container_name_taken,
+    generate_subdomain,
+)
 from app.utils.api_key_utils import (
-    delete_api_key_by_id,
-    generate_api_key,
-    get_authenticated_user,
-    get_user_container,
     store_api_key,
 )
 
@@ -92,7 +92,7 @@ def assign_ports(user_id, requested_ports):
     return host_ports, port_mappings
 
 
-def run_docker_container(available_model, env_vars, name, host_ports):
+def run_docker_container(available_model, env_vars, name, host_ports, labels):
     client = docker.from_env(timeout=200)
     try:
         container = client.containers.run(
@@ -101,6 +101,7 @@ def run_docker_container(available_model, env_vars, name, host_ports):
             environment=env_vars,
             name=name,
             ports=host_ports,
+            labels=labels,
         )
         return container
     except docker.errors.ImageNotFound:
@@ -151,8 +152,27 @@ def make_container():
         host_ports, port_mappings = assign_ports(user["id"], requested_ports)
         current_app.logger.info(f"Assigned port mappings: {port_mappings}")
 
+        # generate subdomain
+        subdomain = generate_subdomain(user["name"], name)
+        domain = os.getenv("DOMAIN")
+
+        # Use the first available port mapping (assuming one primary port per container)
+        first_mapping = port_mappings[0] if port_mappings else None
+        host_port = first_mapping["host_port"] if first_mapping else None
+
+        labels = {
+            "traefik.enable": "true",
+            f"traefik.http.routers.user-{user['id']}.rule": f"Host(`{subdomain}.{domain}`)",
+            f"traefik.http.routers.user-{user['id']}.entrypoints": "web",
+            f"traefik.http.services.user-{user['id']}.loadbalancer.server.port": str(
+                host_port
+            ),
+        }
+
         # Run Docker container
-        container = run_docker_container(available_model, env_vars, name, host_ports)
+        container = run_docker_container(
+            available_model, env_vars, name, host_ports, labels
+        )
         current_app.logger.info(f"Container {container.id} started successfully")
 
         # Save container to the database

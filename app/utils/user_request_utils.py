@@ -5,7 +5,6 @@ import time  # Import time for the current timestamp
 from app.models.container import Container
 
 
-
 """
 - function to check if the user's container name is already taken by the user
 - if it is taken, return true
@@ -13,9 +12,9 @@ from app.models.container import Container
 """
 
 
-def is_container_name_taken(container_name,user):
+def is_container_name_taken(container_name, user):
     users_containers = Container.query.filter_by(
-        name=container_name, user_id=user.get('id')
+        name=container_name, user_id=user.get("id")
     ).all()
     return len(users_containers) > 0
 
@@ -52,3 +51,7 @@ def assign_port(user_id, unique_offset=0, max_retries=25):
         port += 1
 
     raise Exception("No available port found after retries")
+
+
+def generate_subdomain(user_name, container_name):
+    return f"{user_name}-{container_name}"

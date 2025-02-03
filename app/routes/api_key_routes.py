@@ -100,3 +100,11 @@ def get_api_keys_by_container_id(container_id):
         ),
         200,
     )
+
+
+# validate api key
+@api_key_bp.route("/validate", methods=["POST"])
+def validate_api_key():
+    current_app.logger.info("Validate API Key endpoint hit")
+
+    return jsonify({"message": "API Key validated successfully"}), 200
