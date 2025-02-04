@@ -1,10 +1,10 @@
 from app import create_app, db
 
 from sqlalchemy.exc import OperationalError
+
 # from app.models.user import User
 
 app = create_app()
-
 
 
 def create_tables():
@@ -21,7 +21,7 @@ def create_tables():
         print(f"Details: {e}")
 
 
-
 if __name__ == "__main__":
     create_tables()
-    app.run(debug=True, port=5001,host='0.0.0.0')
+    print(app.url_map)
+    app.run(debug=True, port=5001, host="0.0.0.0")

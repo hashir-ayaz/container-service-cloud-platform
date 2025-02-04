@@ -153,8 +153,12 @@ def make_container():
         current_app.logger.info(f"Assigned port mappings: {port_mappings}")
 
         # generate subdomain
-        subdomain = generate_subdomain(user["name"], name)
-        domain = os.getenv("DOMAIN")
+        subdomain = generate_subdomain(user["username"], name)
+        current_app.logger.info(f"Generated subdomain: {subdomain}")
+
+        # get domain
+        domain = os.environ.get("DOMAIN")
+        current_app.logger.info(f"Big domain: {domain}")
 
         # Use the first available port mapping (assuming one primary port per container)
         first_mapping = port_mappings[0] if port_mappings else None
@@ -168,7 +172,7 @@ def make_container():
                 host_port
             ),
         }
-
+        current_app.logger.info("Traefik labels set")
         # Run Docker container
         container = run_docker_container(
             available_model, env_vars, name, host_ports, labels
@@ -176,6 +180,7 @@ def make_container():
         current_app.logger.info(f"Container {container.id} started successfully")
 
         # Save container to the database
+        current_app.logger.info("Saving container to the database")
         new_container = save_container_to_db(
             user_id=user["id"],
             available_model_id=available_model_id,
@@ -183,10 +188,11 @@ def make_container():
             env_vars=env_vars,
             port_mappings=port_mappings,
         )
-
+        current_app.logger.info("Container saved successfully")
         db.session.commit()  # ✅ Ensure container is fully saved
 
         # ✅ Re-fetch container to ensure it exists
+        current_app.logger.info("Refetching container from the database")
         saved_container = Container.query.get(new_container.id)
         if not saved_container:
             current_app.logger.error(
