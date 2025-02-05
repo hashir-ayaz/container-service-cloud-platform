@@ -95,7 +95,15 @@ def get_api_keys_by_container_id(container_id):
         jsonify(
             {
                 "message": "API keys retrieved successfully",
-                "api_keys": [{"id": key.id, "key": key.key} for key in api_keys],
+                "container_id": container_id,  # Include container_id in response
+                "api_keys": [
+                    {
+                        "id": key.id,
+                        "key": key.key,
+                        "container_id": key.container_id,  # Ensure each key has container_id
+                    }
+                    for key in api_keys
+                ],
             }
         ),
         200,
