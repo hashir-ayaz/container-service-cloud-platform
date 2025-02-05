@@ -94,6 +94,7 @@ def assign_ports(user_id, requested_ports):
 
 def run_docker_container(available_model, env_vars, name, host_ports, labels):
     client = docker.from_env(timeout=200)
+    network_name="cloud-platform_flask_network"
     try:
         container = client.containers.run(
             image=available_model.docker_image,
@@ -102,6 +103,7 @@ def run_docker_container(available_model, env_vars, name, host_ports, labels):
             name=name,
             ports=host_ports,
             labels=labels,
+            network=network_name 
         )
         return container
     except docker.errors.ImageNotFound:
@@ -175,7 +177,7 @@ def make_container():
 
         # Use the first available port mapping (assuming one primary port per container)
         first_mapping = port_mappings[0] if port_mappings else None
-        host_port = first_mapping["host_port"] if first_mapping else None
+        container_port = first_mapping["container_port"] if first_mapping else None
 
         # Create unique router name using user ID and container ID
         router_name = f"user-{user['id']}-{container_id}"
@@ -185,7 +187,7 @@ def make_container():
             f"traefik.http.routers.{router_name}.rule": f"Host(\"{subdomain}.{domain}\")",
             f"traefik.http.routers.{router_name}.entrypoints": "websecure",
             f"traefik.http.routers.{router_name}.tls.certresolver": "myresolver",
-            f"traefik.http.services.{router_name}.loadbalancer.server.port": str(host_port),
+            f"traefik.http.services.{router_name}.loadbalancer.server.port": str(container_port),
         }
         current_app.logger.info(f"Traefik labels set for {router_name}: {labels}")
 
