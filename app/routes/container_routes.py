@@ -152,35 +152,15 @@ def make_container():
         host_ports, port_mappings = assign_ports(user["id"], requested_ports)
         current_app.logger.info(f"Assigned port mappings: {port_mappings}")
 
-        # generate subdomain
+        # Generate subdomain
         subdomain = generate_subdomain(user["username"], name)
         current_app.logger.info(f"Generated subdomain: {subdomain}")
 
-        # get domain
+        # Get domain from environment variables
         domain = os.environ.get("DOMAIN")
-        current_app.logger.info(f"Big domain: {domain}")
+        current_app.logger.info(f"Using domain: {domain}")
 
-        # Use the first available port mapping (assuming one primary port per container)
-        first_mapping = port_mappings[0] if port_mappings else None
-        host_port = first_mapping["host_port"] if first_mapping else None
-
-        labels = {
-            "traefik.enable": "true",
-            f"traefik.http.routers.user-{user['id']}.rule": f"Host(`{subdomain}.{domain}`)",
-            f"traefik.http.routers.user-{user['id']}.entrypoints": "web",
-            f"traefik.http.services.user-{user['id']}.loadbalancer.server.port": str(
-                host_port
-            ),
-        }
-        current_app.logger.info("Traefik labels set")
-        # Run Docker container
-        container = run_docker_container(
-            available_model, env_vars, name, host_ports, labels
-        )
-        current_app.logger.info(f"Container {container.id} started successfully")
-
-        # Save container to the database
-        current_app.logger.info("Saving container to the database")
+        # Save the container to DB first to generate a unique container_id
         new_container = save_container_to_db(
             user_id=user["id"],
             available_model_id=available_model_id,
@@ -188,39 +168,59 @@ def make_container():
             env_vars=env_vars,
             port_mappings=port_mappings,
         )
-        current_app.logger.info("Container saved successfully")
         db.session.commit()  # ✅ Ensure container is fully saved
 
-        # ✅ Re-fetch container to ensure it exists
-        current_app.logger.info("Refetching container from the database")
-        saved_container = Container.query.get(new_container.id)
-        if not saved_container:
-            current_app.logger.error(
-                f"Container {new_container.id} not found in DB after commit."
-            )
-            db.session.rollback()  # 🔴 Undo any changes before failing
-            return jsonify({"error": "Container save failed"}), 500
+        # Retrieve container ID for unique router name
+        container_id = new_container.id
+
+        # Use the first available port mapping (assuming one primary port per container)
+        first_mapping = port_mappings[0] if port_mappings else None
+        host_port = first_mapping["host_port"] if first_mapping else None
+
+        # Create unique router name using user ID and container ID
+        router_name = f"user-{user['id']}-{container_id}"
+
+        labels = {
+            "traefik.enable": "true",
+            f"traefik.http.routers.{router_name}.rule": f"Host(\"{subdomain}.{domain}\")",
+            f"traefik.http.routers.{router_name}.entrypoints": "websecure",
+            f"traefik.http.routers.{router_name}.tls.certresolver": "myresolver",
+            f"traefik.http.services.{router_name}.loadbalancer.server.port": str(host_port),
+        }
+        current_app.logger.info(f"Traefik labels set for {router_name}: {labels}")
+
+        # Run Docker container
+        container = run_docker_container(
+            available_model, env_vars, name, host_ports, labels
+        )
+        current_app.logger.info(f"Container {container.id} started successfully")
 
         # ✅ Introduce a short delay (PostgreSQL replication lag fix)
         import time
-
         time.sleep(1)
 
-        # Create and Store API Key
+        # Re-fetch to ensure it exists in the DB
+        saved_container = Container.query.get(container_id)
+        if not saved_container:
+            current_app.logger.error(f"Container {container_id} not found after commit.")
+            db.session.rollback()
+            return jsonify({"error": "Container save failed"}), 500
+
+        # Create and store API Key
         try:
-            api_key_value = store_api_key(user["id"], new_container.id)
+            api_key_value = store_api_key(user["id"], container_id)
             current_app.logger.info(
-                f"API Key {api_key_value} created and stored for container {new_container.id}"
+                f"API Key {api_key_value} created and stored for container {container_id}"
             )
         except Exception as e:
             current_app.logger.error(f"Error generating API key: {str(e)}")
-            db.session.rollback()  # 🔴 Rollback if API key creation fails
+            db.session.rollback()
             return jsonify({"error": "Failed to generate API key"}), 500
 
         return jsonify(
             {
                 "message": "Container created successfully",
-                "container_id": new_container.id,
+                "container_id": container_id,
                 "available_model_id": available_model_id,
                 "environment": env_vars,
                 "ports": port_mappings,
@@ -228,22 +228,21 @@ def make_container():
         )
 
     except ValueError as e:
-        db.session.rollback()  # 🔴 Rollback on validation errors
+        db.session.rollback()
         return make_response(jsonify({"error": str(e)}), 400)
 
     except LookupError as e:
-        db.session.rollback()  # 🔴 Rollback on lookup errors
+        db.session.rollback()
         return make_response(jsonify({"error": str(e)}), 404)
 
     except RuntimeError as e:
-        db.session.rollback()  # 🔴 Rollback on runtime errors
+        db.session.rollback()
         return make_response(jsonify({"error": str(e)}), 500)
 
     except Exception as e:
-        db.session.rollback()  # 🔴 Rollback on unexpected errors
+        db.session.rollback()
         current_app.logger.error(f"Unexpected error: {str(e)}")
         return make_response(jsonify({"error": "Internal server error"}), 500)
-
 
 @deploy_bp.route("/container/<string:container_id>", methods=["GET"])
 @login_required
