@@ -94,7 +94,7 @@ def assign_ports(user_id, requested_ports):
 
 def run_docker_container(available_model, env_vars, name, host_ports, labels):
     client = docker.from_env(timeout=200)
-    network_name="cloud-platform_flask_network"
+    network_name = "cloud-platform_flask_network"
     try:
         container = client.containers.run(
             image=available_model.docker_image,
@@ -103,7 +103,7 @@ def run_docker_container(available_model, env_vars, name, host_ports, labels):
             name=name,
             ports=host_ports,
             labels=labels,
-            network=network_name 
+            network=network_name,
         )
         return container
     except docker.errors.ImageNotFound:
@@ -184,10 +184,13 @@ def make_container():
 
         labels = {
             "traefik.enable": "true",
-            f"traefik.http.routers.{router_name}.rule": f"Host(\"{subdomain}.{domain}\")",
+            f"traefik.http.routers.{router_name}.rule": f'Host("{subdomain}.{domain}")',
             f"traefik.http.routers.{router_name}.entrypoints": "websecure",
             f"traefik.http.routers.{router_name}.tls.certresolver": "myresolver",
-            f"traefik.http.services.{router_name}.loadbalancer.server.port": str(container_port),
+            f"traefik.http.services.{router_name}.loadbalancer.server.port": str(
+                container_port
+            ),
+            f"traefik.http.routers.{router_name}.middlewares": "api-key-auth",
         }
         current_app.logger.info(f"Traefik labels set for {router_name}: {labels}")
 
@@ -199,12 +202,15 @@ def make_container():
 
         # ✅ Introduce a short delay (PostgreSQL replication lag fix)
         import time
+
         time.sleep(1)
 
         # Re-fetch to ensure it exists in the DB
         saved_container = Container.query.get(container_id)
         if not saved_container:
-            current_app.logger.error(f"Container {container_id} not found after commit.")
+            current_app.logger.error(
+                f"Container {container_id} not found after commit."
+            )
             db.session.rollback()
             return jsonify({"error": "Container save failed"}), 500
 
@@ -245,6 +251,7 @@ def make_container():
         db.session.rollback()
         current_app.logger.error(f"Unexpected error: {str(e)}")
         return make_response(jsonify({"error": "Internal server error"}), 500)
+
 
 @deploy_bp.route("/container/<string:container_id>", methods=["GET"])
 @login_required
