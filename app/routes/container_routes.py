@@ -191,6 +191,7 @@ def make_container():
                 container_port
             ),
             f"traefik.http.routers.{router_name}.middlewares": "api-key-auth",
+            f"traefik.http.routers.{router_name}.middlewares": "rate-limit",
         }
         current_app.logger.info(f"Traefik labels set for {router_name}: {labels}")
 
