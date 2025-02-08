@@ -232,6 +232,7 @@ def make_container():
                 "available_model_id": available_model_id,
                 "environment": env_vars,
                 "ports": port_mappings,
+                "domain": f"https://{subdomain}.{domain}",
             }
         )
 
@@ -295,7 +296,7 @@ def get_container_by_id(container_id):
             "created_at": container.created_at.isoformat(),  # Ensure JSON serializable
             "updated_at": container.available_model.updated_at.isoformat(),  # Model update time
             "is_active": container.available_model.is_active,  # Model active status
-            "api_keys": api_keys,  # Include API keys
+            "api_keys": api_keys,  # Include API keys,
         }
     )
 
