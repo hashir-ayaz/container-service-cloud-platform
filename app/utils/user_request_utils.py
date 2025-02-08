@@ -55,3 +55,28 @@ def assign_port(user_id, unique_offset=0, max_retries=25):
 
 def generate_subdomain(user_name, container_name):
     return f"{user_name}-{container_name}"
+
+
+def extract_container_name(complete_domain):
+    """
+    Extracts the container name from a subdomain-based URL where
+    the subdomain follows the format: "username-container_name".
+
+    Example:
+    Input: "https://hashir-test-grafana.hashirayaz.site"
+    Output: "test-grafana"
+    """
+    # Remove the protocol (http:// or https://) if present
+    if "://" in complete_domain:
+        complete_domain = complete_domain.split("://")[1]
+
+    # Extract the subdomain (first part before the first dot)
+    subdomain = complete_domain.split(".")[0]
+
+    # Split by the first hyphen (-) to separate "username" and "container_name"
+    parts = subdomain.split(
+        "-", 1
+    )  # Split into 2 parts: ['username', 'container_name']
+
+    # Return only the container name part
+    return parts[1] if len(parts) > 1 else None  # Return None if format is incorrect

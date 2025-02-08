@@ -10,6 +10,7 @@ from app.utils.api_key_utils import (
     get_user_container,
     store_api_key,
 )
+from app.utils.user_request_utils import extract_container_name
 
 # Define the Blueprint
 api_key_bp = Blueprint("api_key", __name__, url_prefix="/api/api-keys")
@@ -110,9 +111,40 @@ def get_api_keys_by_container_id(container_id):
     )
 
 
-# validate api key
+# Validate API Key
 @api_key_bp.route("/validate", methods=["POST"])
 def validate_api_key():
+    """
+    Validates the API key and ensures it has access to the requested container.
+    """
     current_app.logger.info("Validate API Key endpoint hit")
+
+    # 1️⃣ Check if API key is present in request headers
+    api_key = request.headers.get("X-API-Key")
+    if not api_key:
+        return jsonify({"message": "Missing API Key"}), 400
+
+    # 2️⃣ Check if API key exists in the database
+    api_key_obj = APIKey.query.filter_by(key=api_key, is_active=True).first()
+    if not api_key_obj:
+        return jsonify({"message": "Invalid API Key"}), 401
+
+    # 3️⃣ Extract container name from request URL
+    host_url = request.host  # Example: "test-grafana-hashir.hashirayaz.site"
+    container_name = extract_container_name(host_url)
+
+    if not container_name:
+        return jsonify({"message": "Invalid URL structure"}), 400
+
+    # 4️⃣ Check if the API key is authorized to access this container
+    container = Container.query.filter_by(
+        id=api_key_obj.container_id, name=container_name
+    ).first()
+
+    if not container:
+        return (
+            jsonify({"message": "Forbidden: You don't have access to this container"}),
+            403,
+        )
 
     return jsonify({"message": "API Key validated successfully"}), 200
